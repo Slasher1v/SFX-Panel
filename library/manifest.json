@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "categories": ["UI", "Transition", "Impact", "Ambience"],
+  "sounds": [
+    { "id": "beep",   "name": "Beep",   "category": "UI",         "tags": ["ui", "alert"],        "file": "sounds/beep.wav" },
+    { "id": "pop",    "name": "Pop",    "category": "UI",         "tags": ["ui", "click"],        "file": "sounds/pop.wav" },
+    { "id": "whoosh", "name": "Whoosh", "category": "Transition", "tags": ["transition", "swish"], "file": "sounds/whoosh.wav" },
+    { "id": "riser",  "name": "Riser",  "category": "Transition", "tags": ["riser", "build"],     "file": "sounds/riser.wav" }
+  ]
+}

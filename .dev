@@ -1,0 +1,3 @@
+This marker file disables the self-updater for this working copy, so your
+dev folder is never overwritten by a release. Do NOT include it in the
+distributed/packaged version.

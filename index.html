@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self' file: 'unsafe-inline' 'unsafe-eval' blob: data:; media-src file: blob: 'self'; img-src file: data: blob: 'self';" />
+    <title>My SFX Panel</title>
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<!-- Self-update banner (shown only when a newer version is published) -->
+<div id="updateBar" class="update-bar" hidden>
+    <span id="updateMsg" class="update-msg">Update available</span>
+    <button id="updateBtn">Update</button>
+    <span id="updateClose" class="update-close" title="Dismiss">×</span>
+</div>
+
+<div class="app">
+    <!-- ===== Sidebar ===== -->
+    <aside class="sidebar">
+        <div class="searchbar">
+            <span id="favToggle" class="fav" data-icon="star" title="Show favorites only"></span>
+            <input id="search" type="text" placeholder="Search" autocomplete="off" />
+        </div>
+        <div id="tree" class="tree"><!-- tree rendered here --></div>
+
+        <div class="tags-section">
+            <div class="tags-head"><span>Tags</span><span id="addTag" class="addtag" data-icon="plus" title="New tag"></span></div>
+            <div id="tagsList" class="tags-list"><!-- tags rendered here --></div>
+        </div>
+
+        <div class="sidebar-foot">
+            <div id="addFolder" class="navrow"><span class="ico" data-icon="plus"></span> Add folder</div>
+        </div>
+    </aside>
+
+    <!-- Hidden folder picker (reliable in CEP, unlike cep.fs dialogs) -->
+    <input id="folderInput" type="file" webkitdirectory directory multiple hidden />
+
+    <!-- ===== Content ===== -->
+    <section class="content">
+        <div id="grid" class="grid"><!-- items rendered here --></div>
+
+        <!-- Preview player (Composer-style); appears when an item is selected
+             and slides open/closed via the chevron in its header. -->
+        <div id="player" class="player collapsed" hidden>
+            <div id="playerHead" class="player-head" title="Show / hide preview">
+                <span class="phead-label">Preview</span>
+                <span id="pHeadName" class="phead-name">—</span>
+                <span id="pToggle" class="phead-toggle" data-icon="chevronUp"></span>
+            </div>
+            <div id="playerBody" class="player-body">
+            <div class="transport">
+                <button id="pRestart" title="Restart" data-icon="restart"></button>
+                <button id="pPlay" title="Play / pause" data-icon="play"></button>
+                <button id="pVol" title="Mute" data-icon="volume"></button>
+                <input id="pSeek" class="seek" type="range" min="0" max="1000" value="0" />
+                <span id="pTime" class="tc">00:00:00.00</span>
+            </div>
+            <canvas id="pWave" class="pwave"></canvas>
+            <div class="controls">
+                <span class="ctl-group">
+                    <span class="lbl">Pitch:</span>
+                    <input id="pPitch" class="pitch" type="range" min="-12" max="12" value="0" step="1" />
+                    <span id="pPitchVal" class="pitchval">0</span>
+                    <button id="pPitchReset" class="reset">Reset</button>
+                </span>
+                <label class="rev"><input id="pReverse" type="checkbox" /> Reverse</label>
+                <span class="ctl-group">
+                    <span class="lbl">Reverb:</span>
+                    <input id="pReverb" class="pitch" type="range" min="0" max="100" value="0" step="1" title="Reverb amount (adds a tail)" />
+                    <span id="pReverbVal" class="pitchval">0</span>
+                </span>
+                <span class="ctl-group">
+                    <span class="lbl">Treble:</span>
+                    <input id="pTreble" class="pitch" type="range" min="-12" max="12" value="0" step="1" title="High-shelf EQ (dB)" />
+                    <span id="pTrebleVal" class="pitchval">0</span>
+                </span>
+                <span class="spacer"></span>
+                <button id="pAdd" class="primary" title="Add at playhead on the targeted track">Add</button>
+            </div>
+            </div><!-- /player-body -->
+        </div>
+
+        <div class="content-foot">
+            <span class="vol-ico" data-icon="volume" title="Preview volume"></span>
+            <input id="volume" class="foot-slider" type="range" min="0" max="100" value="100" title="Preview volume" />
+            <span class="size-ico" data-icon="size" title="Tile size"></span>
+            <input id="tileSize" class="foot-slider" type="range" min="120" max="320" value="190" title="Tile size" />
+            <span id="viewToggle" class="viewtoggle" data-icon="list" title="Toggle list / grid"></span>
+        </div>
+    </section>
+</div>
+
+<div id="status" class="status"></div>
+
+<!-- Right-click tag assignment popover -->
+<div id="tagMenu" class="tagmenu" hidden></div>
+
+<!-- New / edit tag dialog -->
+<div id="tagModal" class="modal" hidden>
+    <div class="modal-box">
+        <div id="tagModalTitle" class="modal-title">New Tag</div>
+        <input id="tagName" class="tag-name-input" type="text" placeholder="Tag name" autocomplete="off" />
+        <div id="swatches" class="swatches"><!-- color swatches --></div>
+        <div class="modal-actions">
+            <button id="tagDelete" class="del" hidden>Delete</button>
+            <span class="spacer"></span>
+            <button id="tagCancel">Cancel</button>
+            <button id="tagSave" class="primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/CSInterface.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

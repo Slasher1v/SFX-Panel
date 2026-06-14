@@ -1,0 +1,5 @@
+# Personal/runtime data — never published
+library/config.json
+library/_processed/
+_update_tmp/
+.DS_Store

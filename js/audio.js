@@ -25,7 +25,9 @@ window.AudioEngine = (function () {
         for (var i = 0; i < cands.length; i++) {
             try { if (fs.existsSync(cands[i])) return cands[i]; } catch (e) {}
         }
-        return null;
+        // Last resort (mainly Windows): rely on PATH. If ffmpeg isn't installed
+        // the peaks fallback just fails gracefully and the thumbnail stays flat.
+        return "ffmpeg";
     })();
 
     function readArrayBuffer(p) {

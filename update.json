@@ -1,7 +1,7 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "Drag and drop — drag a sound straight onto the timeline.",
+  "notes": "Windows compatibility fixes (import matching, file URLs).",
   "files": [
     "index.html",
     "css/style.css",

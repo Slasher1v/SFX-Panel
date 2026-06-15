@@ -36,6 +36,13 @@
     var $ = function (id) { return document.getElementById(id); };
     var $tree = $("tree"), $grid = $("grid"), $search = $("search"), $status = $("status");
 
+    // Cross-platform file:// URL. Mac: /a/b -> file:///a/b. Windows: C:\a\b -> file:///C:/a/b
+    function fileUrl(p) {
+        var u = p.replace(/\\/g, "/");
+        if (u.charAt(0) !== "/") u = "/" + u;
+        return "file://" + encodeURI(u);
+    }
+
     // ============ Config ============
     function loadConfig() {
         try {
@@ -486,7 +493,7 @@
             player.buffer = null;
             $pPitch.disabled = true; $pReverse.disabled = true;
             var el = new Audio();
-            el.src = "file://" + encodeURI(f.path.replace(/\\/g, "/"));
+            el.src = fileUrl(f.path);
             el.addEventListener("loadedmetadata", function () {
                 player.duration = el.duration || 0; updateTime(0);
             });

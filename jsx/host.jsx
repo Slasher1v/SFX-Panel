@@ -20,12 +20,18 @@ function _esc(s) {
 function _ok(msg)  { return '{"ok":true,"msg":"'  + _esc(msg) + '"}'; }
 function _err(msg) { return '{"ok":false,"err":"' + _esc(msg) + '"}'; }
 
+// Normalize a path for comparison: forward slashes, lowercase. Makes the
+// match work on Windows (\ vs / and drive-letter case differences).
+function _normPath(p) {
+    return String(p).replace(/\\/g, "/").toLowerCase();
+}
+
 // Recursively search the project tree for an already-imported clip
 // whose media path matches the file we're about to drop.
 function _findItemByPath(item, mediaPath) {
     if (!item) return null;
     try {
-        if (item.getMediaPath && item.getMediaPath() === mediaPath) return item;
+        if (item.getMediaPath && _normPath(item.getMediaPath()) === _normPath(mediaPath)) return item;
     } catch (e) {}
     if (item.children && item.children.numItems > 0) {
         for (var i = 0; i < item.children.numItems; i++) {

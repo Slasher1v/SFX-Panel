@@ -213,9 +213,10 @@ body { display: flex; flex-direction: column; height: 100vh; }
 
 .tile {
     background: var(--tile); border: 1px solid var(--border);
-    border-radius: 6px; overflow: hidden; cursor: pointer;
+    border-radius: 6px; overflow: hidden; cursor: grab;
     transition: border-color .08s, background .08s; position: relative;
 }
+.tile:active { cursor: grabbing; }
 .tile:hover { background: var(--tile-hi); border-color: var(--border-hi); }
 .tile.sel { border-color: var(--accent); }
 

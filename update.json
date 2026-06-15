@@ -1,7 +1,7 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "Resizable sidebar — drag the divider between the panels.",
+  "notes": "Drag and drop — drag a sound straight onto the timeline.",
   "files": [
     "index.html",
     "css/style.css",

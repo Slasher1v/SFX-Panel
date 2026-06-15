@@ -322,6 +322,7 @@
         var row = Math.floor(index / m.cols), col = index % m.cols;
         var tile = document.createElement("div");
         tile.className = "tile" + (m.list ? " listrow" : "") + (selectedSound && selectedSound.path === f.path ? " sel" : "");
+        tile.setAttribute("draggable", "true");
         tile.style.position = "absolute";
         tile.style.width = m.tileW + "px";
         if (m.list) {
@@ -367,11 +368,21 @@
         cap.appendChild(badge); cap.appendChild(cname); cap.appendChild(dots); cap.appendChild(star);
         tile.appendChild(canvas); tile.appendChild(cap);
 
-        // Single click = select/preview. Double click = add at the playhead
-        // (drag-to-timeline isn't possible from a CEP panel — see notes).
+        // Single click = select/preview. Double click = add at the playhead.
         tile.addEventListener("click", function () { selectSound(f); });
         tile.addEventListener("dblclick", function () { selectSound(f); addToTimeline("overwrite"); });
         tile.addEventListener("contextmenu", function (e) { e.preventDefault(); openTagMenu(f, e.clientX, e.clientY); });
+
+        // Drag onto the Premiere timeline / project via Adobe's CEP drag format.
+        // If this tile is the selected sound with effects applied, drag the
+        // baked file; otherwise drag the original.
+        tile.addEventListener("dragstart", function (e) {
+            var dragPath = dragFileFor(f);
+            try {
+                e.dataTransfer.setData("com.adobe.cep.dnd.file.0", dragPath);
+                e.dataTransfer.effectAllowed = "copy";
+            } catch (err) {}
+        });
 
         decodeQueue.push({ file: f, canvas: canvas });
         return tile;
@@ -633,27 +644,60 @@
     var WAVE = "#8a8a8a", PLAYED = "#2f8fe6";
     function drawPlayhead(pos) { renderPreviewCanvas(pos); }
 
+    // ============ Effects baking (shared by Add + drag) ============
+    function hasEffects() {
+        return player.mode === "wa" && player.buffer &&
+            (player.pitch !== 0 || player.reverse || player.reverb > 0 || player.treble !== 0);
+    }
+    function effectTag() {
+        return (player.pitch >= 0 ? "p" : "m") + Math.abs(player.pitch) +
+            (player.reverse ? "_rev" : "") +
+            (player.reverb > 0 ? "_rv" + Math.round(player.reverb * 100) : "") +
+            (player.treble !== 0 ? "_tb" + player.treble : "");
+    }
+    function processedPathFor(snd) {
+        return path.join(PROCESSED_DIR, sanitize(snd.name) + "_" + effectTag() + ".wav");
+    }
+    // Render the current effects to a WAV (cached by filename). Returns a Promise<path>.
+    function renderToFile(snd) {
+        var dest = processedPathFor(snd);
+        try { if (fs.existsSync(dest)) return Promise.resolve(dest); } catch (e) {}
+        return AudioEngine.renderProcessed(player.buffer, player.pitch, player.reverse, player.reverb, REVERB_DECAY, player.treble)
+            .then(function (rendered) {
+                try { if (!fs.existsSync(PROCESSED_DIR)) fs.mkdirSync(PROCESSED_DIR, { recursive: true }); } catch (e) {}
+                fs.writeFileSync(dest, AudioEngine.encodeWav(rendered));
+                return dest;
+            });
+    }
+
+    // ---- Drag-to-timeline (Adobe CEP drag format) ----
+    // dragstart is synchronous, so we can't render then; instead we pre-bake the
+    // effected file shortly after the user stops adjusting, and the drag picks it up.
+    var dragRenderTimer = null;
+    function ensureProcessedForDrag() {
+        if (!selectedSound || !hasEffects()) return;
+        clearTimeout(dragRenderTimer);
+        var snd = selectedSound;
+        dragRenderTimer = setTimeout(function () { renderToFile(snd).catch(function () {}); }, 350);
+    }
+    // Which file a tile should drop: the baked effects file if it's the selected
+    // sound with effects already rendered, otherwise the original.
+    function dragFileFor(f) {
+        if (selectedSound && f.path === selectedSound.path && hasEffects()) {
+            var p = processedPathFor(f);
+            try { if (fs.existsSync(p)) return p; } catch (e) {}
+        }
+        return f.path;
+    }
+
     // ============ Add to timeline ============
     function addToTimeline(mode) {
         var snd = selectedSound;
         if (!snd) return;
-        var needProcess = player.mode === "wa" && player.buffer &&
-            (player.pitch !== 0 || player.reverse || player.reverb > 0 || player.treble !== 0);
-
-        if (!needProcess) return doDrop(snd.path, mode);
-
+        if (!hasEffects()) return doDrop(snd.path, mode);
         setStatus("Rendering…");
-        AudioEngine.renderProcessed(player.buffer, player.pitch, player.reverse, player.reverb, REVERB_DECAY, player.treble)
-            .then(function (rendered) {
-                try { if (!fs.existsSync(PROCESSED_DIR)) fs.mkdirSync(PROCESSED_DIR, { recursive: true }); } catch (e) {}
-                var tag = (player.pitch >= 0 ? "p" : "m") + Math.abs(player.pitch) +
-                    (player.reverse ? "_rev" : "") +
-                    (player.reverb > 0 ? "_rv" + Math.round(player.reverb * 100) : "") +
-                    (player.treble !== 0 ? "_tb" + player.treble : "");
-                var tmp = path.join(PROCESSED_DIR, sanitize(snd.name) + "_" + tag + ".wav");
-                fs.writeFileSync(tmp, AudioEngine.encodeWav(rendered));
-                doDrop(tmp, mode);
-            }).catch(function (e) { setStatus("Render failed: " + e.message, "err"); });
+        renderToFile(snd).then(function (tmp) { doDrop(tmp, mode); })
+            .catch(function (e) { setStatus("Render failed: " + e.message, "err"); });
     }
 
     function doDrop(filePath, mode) {
@@ -1006,6 +1050,7 @@
             player.pitch = parseInt(this.value, 10) || 0;
             $pPitchVal.textContent = (player.pitch > 0 ? "+" : "") + player.pitch;
             if (player.playing) playFrom(currentPos());
+            ensureProcessedForDrag();
         });
         // Reset clears ALL effects back to the original sound.
         $("pPitchReset").addEventListener("click", function () {
@@ -1022,16 +1067,19 @@
             player.reverse = this.checked; player.reversedBuf = null;
             if (player.buffer) drawPreviewWave();
             if (player.playing) playFrom(currentPos());
+            ensureProcessedForDrag();
         });
         $("pReverb").addEventListener("input", function () {
             player.reverb = (parseInt(this.value, 10) || 0) / 100;
             $("pReverbVal").textContent = String(parseInt(this.value, 10) || 0);
             if (player.playing) playFrom(currentPos());
+            ensureProcessedForDrag();
         });
         $("pTreble").addEventListener("input", function () {
             player.treble = parseInt(this.value, 10) || 0;
             $("pTrebleVal").textContent = (player.treble > 0 ? "+" : "") + player.treble;
             if (player.playing) playFrom(currentPos());
+            ensureProcessedForDrag();
         });
         $("pAdd").addEventListener("click", function () { addToTimeline("overwrite"); });
 

@@ -59,11 +59,20 @@ body { display: flex; flex-direction: column; height: 100vh; }
 
 /* ============ Sidebar ============ */
 .sidebar {
-    width: 38%; min-width: 150px; max-width: 280px;
+    width: var(--sidebar-w, 240px);
+    flex: 0 0 auto; min-width: 140px;
     background: var(--bg);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
 }
+
+/* Draggable divider between sidebar and content */
+.splitter {
+    flex: 0 0 5px; align-self: stretch;
+    cursor: col-resize; background: var(--border);
+    transition: background .1s;
+}
+.splitter:hover, .splitter.dragging { background: var(--accent); }
 .searchbar {
     display: flex; align-items: center; gap: 6px;
     padding: 8px; border-bottom: 1px solid var(--border);

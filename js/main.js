@@ -901,10 +901,51 @@
         });
     }
 
+    // ============ Resizable sidebar ============
+    function initSplitter() {
+        var sp = $("splitter");
+        if (!sp) return;
+        var appEl = document.querySelector(".app");
+        var dragging = false;
+
+        // Restore saved width
+        var saved = config.settings && config.settings.sidebarWidth;
+        if (saved) document.documentElement.style.setProperty("--sidebar-w", saved + "px");
+
+        function onMove(e) {
+            if (!dragging) return;
+            var w = e.clientX - appEl.getBoundingClientRect().left;
+            w = Math.max(140, Math.min(w, window.innerWidth - 200));
+            document.documentElement.style.setProperty("--sidebar-w", w + "px");
+            // grid columns recompute automatically via the grid's ResizeObserver
+        }
+        function onUp() {
+            if (!dragging) return;
+            dragging = false;
+            sp.classList.remove("dragging");
+            document.body.style.cursor = "";
+            var w = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-w"), 10);
+            config.settings.sidebarWidth = w || 240;
+            saveConfig();
+            if (!$player.hidden && previewPeaks) {
+                if (player.buffer) drawPreviewWave(); else renderPreviewCanvas();
+            }
+        }
+        sp.addEventListener("mousedown", function (e) {
+            dragging = true;
+            sp.classList.add("dragging");
+            document.body.style.cursor = "col-resize";
+            e.preventDefault();
+        });
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+    }
+
     // ============ Wire up ============
     function init() {
         applyIcons();
         loadConfig();
+        initSplitter();
         buildTree();
         renderTree();
         renderTags();

@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "Initial release.",
+  "notes": "Resizable sidebar — drag the divider between the panels.",
   "files": [
     "index.html",
     "css/style.css",

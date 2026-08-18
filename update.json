@@ -1,7 +1,7 @@
 {
-  "version": "1.0.3",
+  "version": "1.1.0",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "Windows compatibility fixes (import matching, file URLs).",
+  "notes": "Themes, clearer sound tiles, and search-aware folder counts.",
   "files": [
     "index.html",
     "css/style.css",

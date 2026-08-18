@@ -27,7 +27,9 @@ unsigned extensions automatically.
 - **Preview player** — stereo waveform, scrub, volume, and bake-in **Pitch**, **Reverb** (with a real tail), **Treble** (EQ), and **Reverse**.
 - **Add to timeline** at the playhead on the **targeted** audio track.
 - **Color tags** (macOS-style) — right-click a sound to tag it, click a tag to filter your whole library.
-- **Self-updating** — a banner appears when a new version ships; your tags, favorites, and folders are preserved.
+- **Search that points the way** — typing turns each folder's count into how many sounds inside it match, and dims the folders with none.
+- **Themes** — eight gradient presets or your own start/end/accent colors, from the gear button beside `+ Add folder`.
+- **Self-updating** — a banner appears when a new version ships; your tags, favorites, folders, and theme are preserved.
 
 ## Updates
 

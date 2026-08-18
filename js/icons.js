@@ -25,6 +25,7 @@ window.Icons = (function () {
         grid:    '<svg ' + S + '><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
         list:    '<svg ' + S + '><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>',
         size:    '<svg ' + S + '><rect x="3" y="3" width="18" height="18" rx="2.5"/><rect x="8" y="8" width="8" height="8" rx="1.5"/></svg>',
-        search:  '<svg ' + S + '><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>'
+        search:  '<svg ' + S + '><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>',
+        settings:'<svg ' + S + '><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l1.8-1.4-1.9-3.2-2.1.8a7.7 7.7 0 0 0-2.6-1.5L14.2 3h-3.8l-.4 2.2a7.7 7.7 0 0 0-2.6 1.5l-2.1-.8-1.9 3.2 1.8 1.4a7.6 7.6 0 0 0 0 3l-1.8 1.4 1.9 3.2 2.1-.8a7.7 7.7 0 0 0 2.6 1.5l.4 2.2h3.8l.4-2.2a7.7 7.7 0 0 0 2.6-1.5l2.1.8 1.9-3.2z"/></svg>'
     };
 })();

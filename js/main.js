@@ -152,6 +152,7 @@
             return;
         }
         tree.forEach(function (root) { $tree.appendChild(treeNodeEl(root, 0)); });
+        refreshTreeCounts();
     }
 
     function treeNodeEl(node, depth) {
@@ -175,7 +176,8 @@
 
         var count = document.createElement("span");
         count.className = "count";
-        count.textContent = node.count ? node.count : "";
+        node.countEl = count;    // refreshTreeCounts() updates these in place
+        node.rowEl = row;
 
         row.appendChild(caret); row.appendChild(ico); row.appendChild(name); row.appendChild(count);
         wrap.appendChild(row);
@@ -221,6 +223,46 @@
         return out;
     }
 
+    // ============ Filtering ============
+    // One definition of "does this file match right now", shared by the grid
+    // and by the folder counts in the tree.
+    function searchQuery() { return $search.value.trim().toLowerCase(); }
+    function filterActive() { return !!searchQuery() || favFilter; }
+    function fileMatches(f, q) {
+        if (favFilter && !isFav(f.path)) return false;
+        if (q && f.name.toLowerCase().indexOf(q) === -1) return false;
+        return true;
+    }
+
+    // How many sounds at/below this folder match the current search.
+    function computeMatches(node, q) {
+        var n = 0, i;
+        for (i = 0; i < node.files.length; i++) if (fileMatches(node.files[i], q)) n++;
+        for (i = 0; i < node.folders.length; i++) n += computeMatches(node.folders[i], q);
+        node.match = n;
+        return n;
+    }
+
+    // While searching, the number on the right of each folder becomes the
+    // match count (highlighted, and the row dims when nothing matches); with
+    // no search it goes back to the plain total. Updated in place so typing
+    // never rebuilds the sidebar.
+    function refreshTreeCounts() {
+        var active = filterActive(), q = searchQuery();
+        if (active) tree.forEach(function (root) { computeMatches(root, q); });
+        (function walk(nodes) {
+            nodes.forEach(function (node) {
+                var n = active ? node.match : node.count;
+                if (node.countEl) {
+                    node.countEl.textContent = (active || n) ? String(n) : "";
+                    node.countEl.className = "count" + (active && n ? " match" : "");
+                }
+                if (node.rowEl) node.rowEl.classList.toggle("nomatch", active && !n);
+                walk(node.folders);
+            });
+        })(tree);
+    }
+
     // ============ Grid rendering ============
     function currentFiles() {
         // Tag filter acts like a Smart Folder: searches the whole library,
@@ -233,13 +275,9 @@
             })
             : folderFilesCache;
 
-        var q = $search.value.trim().toLowerCase();
+        var q = searchQuery();
         if (!q && !favFilter) return files;
-        return files.filter(function (f) {
-            if (favFilter && !isFav(f.path)) return false;
-            if (q && f.name.toLowerCase().indexOf(q) === -1) return false;
-            return true;
-        });
+        return files.filter(function (f) { return fileMatches(f, q); });
     }
 
     // ---- Virtualized grid ----
@@ -897,6 +935,232 @@
         renderGrid();
     }
 
+    // ============ Theme (Settings) ============
+    // A theme is a background gradient + an accent colour. It lives in
+    // config.settings.theme, so — like tags and favourites — it survives
+    // updates. Surfaces in the CSS are translucent, so the gradient shows
+    // through the sidebar, tiles and player without any extra work.
+    var THEME_PRESETS = [
+        { id: "oled",     name: "OLED Black", from: "#000000", to: "#000000", angle: 160, accent: "#2f8fe6" },
+        { id: "graphite", name: "Graphite",   from: "#26292e", to: "#000000", angle: 160, accent: "#8a95a3" },
+        { id: "midnight", name: "Midnight",   from: "#101f47", to: "#000000", angle: 160, accent: "#4c8dff" },
+        { id: "ocean",    name: "Ocean",      from: "#06303a", to: "#00080b", angle: 160, accent: "#25c2d8" },
+        { id: "forest",   name: "Forest",     from: "#0d2e1e", to: "#000000", angle: 160, accent: "#3fc57e" },
+        { id: "ember",    name: "Ember",      from: "#3a140b", to: "#000000", angle: 160, accent: "#ff7a45" },
+        { id: "violet",   name: "Violet",     from: "#281148", to: "#000000", angle: 160, accent: "#a86bff" },
+        { id: "rose",     name: "Rose",       from: "#3d1024", to: "#000000", angle: 160, accent: "#ff6b9d" }
+    ];
+
+    function presetById(id) {
+        for (var i = 0; i < THEME_PRESETS.length; i++) if (THEME_PRESETS[i].id === id) return THEME_PRESETS[i];
+        return null;
+    }
+    // Fill in anything missing from the stored theme (or from a preset id).
+    function normTheme(t) {
+        t = t || {};
+        var base = presetById(t.preset) || THEME_PRESETS[0];
+        return {
+            preset: t.preset || base.id,
+            from: t.from || base.from,
+            to: t.to || base.to,
+            angle: typeof t.angle === "number" ? t.angle : base.angle,
+            accent: t.accent || base.accent
+        };
+    }
+    function currentTheme() { return normTheme(config.settings && config.settings.theme); }
+
+    function gradientCss(t) {
+        // Two identical stops = a flat colour; skip the gradient layer entirely.
+        if (t.from.toLowerCase() === t.to.toLowerCase()) return "none";
+        return "linear-gradient(" + t.angle + "deg, " + t.from + " 0%, " + t.to + " 100%)";
+    }
+    function swatchCss(t) { return t.from.toLowerCase() === t.to.toLowerCase() ? t.from : gradientCss(t); }
+
+    // "#aabbcc" / "#abc" / "aabbcc" -> "#aabbcc"; anything else -> null.
+    function normHex(v) {
+        v = String(v || "").trim().replace(/^#/, "");
+        if (/^[0-9a-f]{3}$/i.test(v)) v = v.charAt(0) + v.charAt(0) + v.charAt(1) + v.charAt(1) + v.charAt(2) + v.charAt(2);
+        return /^[0-9a-f]{6}$/i.test(v) ? "#" + v.toLowerCase() : null;
+    }
+    // Darkened accent, used for selected rows.
+    function darken(hex, amt) {
+        var h = normHex(hex) || "#2f8fe6", out = "#";
+        for (var i = 0; i < 3; i++) {
+            var v = Math.round(parseInt(h.substr(1 + i * 2, 2), 16) * (1 - amt));
+            out += (v < 16 ? "0" : "") + v.toString(16);
+        }
+        return out;
+    }
+
+    function applyTheme(t) {
+        var st = document.documentElement.style;
+        st.setProperty("--bg", t.to);          // base colour behind the gradient
+        st.setProperty("--bg-grad", gradientCss(t));
+        st.setProperty("--accent", t.accent);
+        st.setProperty("--accent-dim", darken(t.accent, .55));
+        st.setProperty("--wave-played", t.accent);
+        PLAYED = t.accent;                     // canvas playhead colour (drawn in JS)
+        if (!$player.hidden && previewPeaks) renderPreviewCanvas();
+    }
+
+    // ---- Settings modal ----
+    var themeDraft = null;      // live-previewed theme while the modal is open
+
+    function openSettings() {
+        $("aboutVersion").textContent = "v" + appVersion();
+        themeDraft = currentTheme();
+        renderThemePresets();
+        syncThemeInputs();
+        $("settingsModal").hidden = false;
+    }
+    // Cancel/Escape puts the saved theme back; Save keeps the draft.
+    function closeSettings(revert) {
+        if (revert) applyTheme(currentTheme());
+        $("settingsModal").hidden = true;
+        themeDraft = null;
+    }
+    function saveSettings() {
+        if (themeDraft) {
+            config.settings.theme = themeDraft;
+            saveConfig();
+        }
+        closeSettings(false);
+        setStatus("Theme saved.", "ok");
+    }
+
+    function renderThemePresets() {
+        var box = $("themePresets");
+        box.innerHTML = "";
+        THEME_PRESETS.forEach(function (p) {
+            var sw = document.createElement("span");
+            sw.className = "tp";
+            sw.setAttribute("data-id", p.id);
+            sw.title = p.name;
+            sw.style.background = swatchCss(p);
+            sw.addEventListener("click", function () {
+                themeDraft = normTheme({ preset: p.id });
+                markPreset();
+                syncThemeInputs();
+                applyTheme(themeDraft);
+            });
+            box.appendChild(sw);
+        });
+        markPreset();
+    }
+    function markPreset() {
+        var kids = $("themePresets").children;
+        for (var i = 0; i < kids.length; i++) {
+            kids[i].classList.toggle("sel", themeDraft && kids[i].getAttribute("data-id") === themeDraft.preset);
+        }
+    }
+
+    function syncThemeInputs() {
+        if (!themeDraft) return;
+        $("gradFrom").value = themeDraft.from;
+        $("gradFromHex").value = themeDraft.from;
+        $("gradTo").value = themeDraft.to;
+        $("gradToHex").value = themeDraft.to;
+        $("gradAccent").value = themeDraft.accent;
+        $("gradAccentHex").value = themeDraft.accent;
+        $("gradAngle").value = String(themeDraft.angle);
+        $("gradAngleVal").textContent = themeDraft.angle + "°";
+        updateThemePreview();
+    }
+    function updateThemePreview() {
+        if (themeDraft) $("themePreview").style.background = swatchCss(themeDraft);
+    }
+
+    // Any manual tweak makes the draft a custom theme and previews it live.
+    function setThemeField(key, value) {
+        if (!themeDraft) return;
+        themeDraft[key] = value;
+        themeDraft.preset = "custom";
+        markPreset();
+        updateThemePreview();
+        applyTheme(themeDraft);
+    }
+
+    // Colour picker and hex field stay in sync; typing an invalid hex is ignored
+    // until it's complete (the picker is unreliable on some CEP builds, so the
+    // hex field is a full alternative rather than a nicety).
+    function bindColorPair(colorId, hexId, key) {
+        var c = $(colorId), h = $(hexId);
+        c.addEventListener("input", function () {
+            h.value = c.value;
+            setThemeField(key, c.value);
+        });
+        h.addEventListener("input", function () {
+            var v = normHex(h.value);
+            if (!v) return;
+            c.value = v;
+            setThemeField(key, v);
+        });
+    }
+
+    function bindThemeInputs() {
+        bindColorPair("gradFrom", "gradFromHex", "from");
+        bindColorPair("gradTo", "gradToHex", "to");
+        bindColorPair("gradAccent", "gradAccentHex", "accent");
+        $("gradAngle").addEventListener("input", function () {
+            var a = parseInt(this.value, 10) || 0;
+            $("gradAngleVal").textContent = a + "°";
+            setThemeField("angle", a);
+        });
+        $("themeReset").addEventListener("click", function () {
+            themeDraft = normTheme({ preset: THEME_PRESETS[0].id });
+            markPreset();
+            syncThemeInputs();
+            applyTheme(themeDraft);
+        });
+    }
+
+    // ============ What's new ============
+    // Ships inside the build it describes, so a panel that has just updated
+    // itself can tell the user what changed the first time it reopens. Seen
+    // versions are recorded in config.json, which updates never overwrite.
+    var CHANGELOG = [
+        {
+            version: "1.1.0",
+            items: [
+                "Sound tiles now stand out from the background, so the grid is much easier to scan.",
+                "Themes — pick a gradient preset or mix your own, in the new Settings button (gear, bottom-left).",
+                "Searching now shows how many matching sounds sit in each folder, and dims the folders with none."
+            ]
+        }
+    ];
+
+    function appVersion() {
+        try { return JSON.parse(fs.readFileSync(path.join(EXT_ROOT, "package.json"), "utf8")).version || "0.0.0"; }
+        catch (e) { return "0.0.0"; }
+    }
+    function changelogFor(v) {
+        for (var i = 0; i < CHANGELOG.length; i++) if (CHANGELOG[i].version === v) return CHANGELOG[i];
+        return null;
+    }
+
+    function showWhatsNew(entry) {
+        if (!entry) return;
+        $("wnVersion").textContent = "v" + entry.version;
+        var list = $("wnList");
+        list.innerHTML = "";
+        entry.items.forEach(function (text) {
+            var li = document.createElement("li");
+            li.textContent = text;
+            list.appendChild(li);
+        });
+        $("whatsNewModal").hidden = false;
+    }
+    function closeWhatsNew() { $("whatsNewModal").hidden = true; }
+
+    // Called on launch: show the notes once per version, then remember it.
+    function maybeShowWhatsNew() {
+        var v = appVersion();
+        if (config.settings.seenVersion === v) return;
+        config.settings.seenVersion = v;
+        saveConfig();
+        showWhatsNew(changelogFor(v));
+    }
+
     // ============ Premiere helpers ============
     function parseResult(res) {
         if (res === "EvalScript error.") return { ok: false, err: "ExtendScript error (check host.jsx)" };
@@ -996,17 +1260,19 @@
     function init() {
         applyIcons();
         loadConfig();
+        applyTheme(currentTheme());
         initSplitter();
         buildTree();
         renderTree();
         renderTags();
         if (tree.length) selectFolder(tree[0]); else renderGrid();
 
-        $search.addEventListener("input", renderGrid);
+        $search.addEventListener("input", function () { renderGrid(); refreshTreeCounts(); });
         $("favToggle").addEventListener("click", function () {
             favFilter = !favFilter;
             this.classList.toggle("on", favFilter);
             renderGrid();
+            refreshTreeCounts();
         });
         $("addFolder").addEventListener("click", addFolder);
         $("folderInput").addEventListener("change", function (e) {
@@ -1024,6 +1290,26 @@
             else if (e.key === "Escape") closeTagModal();
         });
         $("tagModal").addEventListener("click", function (e) { if (e.target === this) closeTagModal(); });
+
+        // Settings (theme)
+        $("openSettings").addEventListener("click", openSettings);
+        $("settingsSave").addEventListener("click", saveSettings);
+        $("settingsCancel").addEventListener("click", function () { closeSettings(true); });
+        $("settingsModal").addEventListener("click", function (e) { if (e.target === this) closeSettings(true); });
+        bindThemeInputs();
+
+        // What's new
+        $("showWhatsNew").addEventListener("click", function () {
+            showWhatsNew(changelogFor(appVersion()) || CHANGELOG[0]);
+        });
+        $("wnClose").addEventListener("click", closeWhatsNew);
+        $("whatsNewModal").addEventListener("click", function (e) { if (e.target === this) closeWhatsNew(); });
+        // Escape closes the top-most dialog.
+        document.addEventListener("keydown", function (e) {
+            if (e.key !== "Escape") return;
+            if (!$("whatsNewModal").hidden) closeWhatsNew();
+            else if (!$("settingsModal").hidden) closeSettings(true);
+        });
         // dismiss the right-click menu on any outside interaction
         document.addEventListener("click", function () { closeTagMenu(); });
         document.addEventListener("contextmenu", function (e) {
@@ -1138,6 +1424,7 @@
         });
 
         checkForUpdate();
+        maybeShowWhatsNew();
     }
 
     init();

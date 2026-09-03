@@ -124,13 +124,19 @@
             sp.open = true;
             tree.push(sp);
         }
-        // User library = each added root folder
+        // User library = each added root folder. A root whose folder has gone
+        // missing still gets a (dimmed) row, so it can be removed instead of
+        // sitting in config.json forever.
         config.roots.forEach(function (r) {
+            var n;
             if (fs.existsSync(r.path)) {
-                var n = scanFolder(r.path, r.name);
-                n.open = true;
-                tree.push(n);
+                n = scanFolder(r.path, r.name);
+            } else {
+                n = { name: r.name, path: r.path, folders: [], files: [], type: "folder", open: false, count: 0, missing: true };
             }
+            n.open = !n.missing;
+            n.rootPath = r.path;      // identifies the config.roots entry to remove
+            tree.push(n);
         });
     }
 
@@ -180,6 +186,19 @@
         node.rowEl = row;
 
         row.appendChild(caret); row.appendChild(ico); row.appendChild(name); row.appendChild(count);
+
+        if (node.missing) {
+            row.classList.add("missing");
+            row.title = "Folder not found — it may have been moved, renamed, or on a drive that isn't connected.";
+        }
+        // Added roots (not the bundled Starter Pack) can be taken back out.
+        if (node.rootPath) {
+            var rm = document.createElement("span");
+            rm.className = "rmroot"; rm.innerHTML = Icons.close;
+            rm.title = "Remove this folder from the panel (the files are not deleted)";
+            rm.addEventListener("click", function (e) { e.stopPropagation(); removeRoot(node); });
+            row.appendChild(rm);
+        }
         wrap.appendChild(row);
 
         var kids = document.createElement("div");
@@ -196,6 +215,38 @@
         });
         row.addEventListener("click", function () { selectFolder(node); });
         return wrap;
+    }
+
+    // Take an added folder back out of the library. Only config.roots changes —
+    // the sounds stay on disk, and their tags/favourites stay in config keyed by
+    // path, so re-adding the folder brings everything back.
+    function removeRoot(node) {
+        var i = -1;
+        for (var k = 0; k < config.roots.length; k++) {
+            if (config.roots[k].path === node.rootPath) { i = k; break; }
+        }
+        if (i === -1) return;
+        var name = config.roots[i].name;
+        config.roots.splice(i, 1);
+        saveConfig();
+
+        var keepPath = selectedFolder ? selectedFolder.path : null;
+        buildTree();
+        var again = keepPath ? findNodeByPath(keepPath) : null;
+        selectFolder(again || tree[0] || null);   // re-renders the tree
+        setStatus("Removed \u201C" + name + "\u201D — the files were not deleted.", "ok");
+    }
+
+    function findNodeByPath(p) {
+        var found = null;
+        (function walk(nodes) {
+            nodes.forEach(function (n) {
+                if (found) return;
+                if (n.path === p) { found = n; return; }
+                walk(n.folders);
+            });
+        })(tree);
+        return found;
     }
 
     var folderFilesCache = [];      // collectFiles(selectedFolder), computed once on select
@@ -507,6 +558,10 @@
         loadIntoPlayer(f);
     }
 
+    // Composer-style: clicking a sound previews it straight away. Settings ▸
+    // Playback turns it off; missing/older configs default to on.
+    function autoPlayEnabled() { return config.settings.autoPlay !== false; }
+
     function loadIntoPlayer(f) {
         stopPlayback();
         player.sound = f; player.buffer = null; player.reversedBuf = null;
@@ -524,6 +579,7 @@
             $pPitch.disabled = false; $pReverse.disabled = false;
             drawPreviewWave();
             updateTime(0);
+            if (autoPlayEnabled()) playFrom(0);
         }).catch(function () {
             if (player.sound !== f) return;
             // Fallback: play through an <audio> element (no pitch/reverse).
@@ -534,6 +590,7 @@
             el.src = fileUrl(f.path);
             el.addEventListener("loadedmetadata", function () {
                 player.duration = el.duration || 0; updateTime(0);
+                if (autoPlayEnabled() && player.sound === f) playFrom(0);
             });
             el.addEventListener("timeupdate", function () { updateTime(el.currentTime); });
             el.addEventListener("ended", function () { player.playing = false; $pPlay.innerHTML = Icons.play; });
@@ -1005,9 +1062,12 @@
 
     // ---- Settings modal ----
     var themeDraft = null;      // live-previewed theme while the modal is open
+    var autoPlayDraft = true;   // pending value of the "play on click" toggle
 
     function openSettings() {
         $("aboutVersion").textContent = "v" + appVersion();
+        autoPlayDraft = autoPlayEnabled();
+        $("optAutoPlay").checked = autoPlayDraft;
         themeDraft = currentTheme();
         renderThemePresets();
         syncThemeInputs();
@@ -1020,12 +1080,11 @@
         themeDraft = null;
     }
     function saveSettings() {
-        if (themeDraft) {
-            config.settings.theme = themeDraft;
-            saveConfig();
-        }
+        if (themeDraft) config.settings.theme = themeDraft;
+        config.settings.autoPlay = autoPlayDraft;
+        saveConfig();
         closeSettings(false);
-        setStatus("Theme saved.", "ok");
+        setStatus("Settings saved.", "ok");
     }
 
     function renderThemePresets() {
@@ -1119,6 +1178,14 @@
     // itself can tell the user what changed the first time it reopens. Seen
     // versions are recorded in config.json, which updates never overwrite.
     var CHANGELOG = [
+        {
+            version: "1.2.0",
+            items: [
+                "Clicking a sound now previews it straight away, like Premiere Composer. You can turn this off in Settings \u25B8 Playback.",
+                "Added folders can be removed again — hover the folder in the sidebar and click the \u00D7. Your sounds stay on disk, and the folder's tags and favourites come back if you re-add it.",
+                "A folder that has been moved, renamed, or left on a disconnected drive now shows greyed out instead of quietly disappearing."
+            ]
+        },
         {
             version: "1.1.0",
             items: [
@@ -1297,6 +1364,7 @@
         $("settingsCancel").addEventListener("click", function () { closeSettings(true); });
         $("settingsModal").addEventListener("click", function (e) { if (e.target === this) closeSettings(true); });
         bindThemeInputs();
+        $("optAutoPlay").addEventListener("change", function () { autoPlayDraft = this.checked; });
 
         // What's new
         $("showWhatsNew").addEventListener("click", function () {

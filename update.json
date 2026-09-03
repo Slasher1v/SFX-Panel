@@ -1,7 +1,7 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "Themes, clearer sound tiles, and search-aware folder counts.",
+  "notes": "Click-to-preview, and you can remove folders you've added.",
   "files": [
     "index.html",
     "css/style.css",

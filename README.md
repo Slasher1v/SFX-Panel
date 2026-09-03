@@ -22,9 +22,9 @@ unsigned extensions automatically.
 
 ## Features
 
-- **Folder library** — point it at any folder of sound effects (`+ Add folder`); nested subfolders become a browsable tree.
+- **Folder library** — point it at any folder of sound effects (`+ Add folder`); nested subfolders become a browsable tree. Hover a folder you've added and click the `×` to take it back out.
 - **Waveform thumbnails** for WAV / MP3 / M4A / AIFF / FLAC / OGG, virtualized so 2,000+ file folders stay fast.
-- **Preview player** — stereo waveform, scrub, volume, and bake-in **Pitch**, **Reverb** (with a real tail), **Treble** (EQ), and **Reverse**.
+- **Preview player** — click a sound and it plays straight away (switchable in Settings). Stereo waveform, scrub, volume, and bake-in **Pitch**, **Reverb** (with a real tail), **Treble** (EQ), and **Reverse**.
 - **Add to timeline** at the playhead on the **targeted** audio track.
 - **Color tags** (macOS-style) — right-click a sound to tag it, click a tag to filter your whole library.
 - **Search that points the way** — typing turns each folder's count into how many sounds inside it match, and dims the folders with none.

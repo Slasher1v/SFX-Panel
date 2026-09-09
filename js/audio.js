@@ -30,6 +30,13 @@ window.AudioEngine = (function () {
         return "ffmpeg";
     })();
 
+    // Chromium starts an AudioContext created before any user gesture in the
+    // "suspended" state: sources play silently until it is resumed. Called on
+    // every playback attempt — a no-op once the context is running.
+    function resume() {
+        try { if (actx.state === "suspended" && actx.resume) actx.resume(); } catch (e) {}
+    }
+
     function readArrayBuffer(p) {
         var b = fs.readFileSync(p); // Node Buffer
         return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
@@ -209,6 +216,7 @@ window.AudioEngine = (function () {
 
     return {
         context: actx,
+        resume: resume,
         decode: decode,
         peaks: peaks,
         channelPeaks: channelPeaks,

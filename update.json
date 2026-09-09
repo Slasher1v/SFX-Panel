@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "Click-to-preview, and you can remove folders you've added.",
+  "notes": "The preview now opens when you click a sound.",
   "files": [
     "index.html",
     "css/style.css",

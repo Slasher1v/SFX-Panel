@@ -570,8 +570,9 @@
         $("pReverb").value = "0"; $("pReverbVal").textContent = "0";
         $("pTreble").value = "0"; $("pTrebleVal").textContent = "0";
         var head = $("pHeadName"); if (head) head.textContent = f.name;
+        previewPeaks = null;            // don't flash the previous sound's waveform
         $player.hidden = false;
-        $player.classList.toggle("collapsed", !previewExpanded);
+        setPreviewExpanded(previewExpanded);
 
         AudioEngine.decode(f.path).then(function (buf) {
             if (player.sound !== f) return;
@@ -601,16 +602,23 @@
         });
     }
 
-    var previewExpanded = false;    // collapsed by default; slides open on click
-    function setPreviewExpanded(expanded) {
+    // The preview opens as soon as you pick a sound. Collapsing it with the
+    // header chevron sticks — across selections and restarts — so that choice
+    // isn't undone by the next click.
+    var previewExpanded = true;
+    function setPreviewExpanded(expanded, remember) {
         previewExpanded = expanded;
         $player.classList.toggle("collapsed", !expanded);
+        if (remember) {
+            config.settings.previewOpen = expanded;
+            saveConfig();
+        }
         if (expanded) {
             // canvas was clipped while collapsed — redraw to current size
             if (player.buffer) drawPreviewWave(); else renderPreviewCanvas();
         }
     }
-    function togglePreview() { setPreviewExpanded($player.classList.contains("collapsed")); }
+    function togglePreview() { setPreviewExpanded($player.classList.contains("collapsed"), true); }
 
     function activeBuffer() {
         if (!player.buffer) return null;
@@ -622,6 +630,9 @@
     }
 
     function playFrom(sec) {
+        // The AudioContext is created at load, before any user gesture, so
+        // Chromium may hand it back suspended — nothing plays until it's resumed.
+        AudioEngine.resume();
         if (player.mode === "el") {
             if (!player.audioEl) return;
             player.audioEl.currentTime = Math.min(sec, player.duration || 0);
@@ -1179,6 +1190,13 @@
     // versions are recorded in config.json, which updates never overwrite.
     var CHANGELOG = [
         {
+            version: "1.2.1",
+            items: [
+                "The preview now opens as soon as you click a sound, instead of staying shut — so you see the waveform and hear it right away. Collapse it with the chevron and it stays collapsed, next launch included.",
+                "Fixed preview playback that could stay silent until you pressed play."
+            ]
+        },
+        {
             version: "1.2.0",
             items: [
                 "Clicking a sound now previews it straight away, like Premiere Composer. You can turn this off in Settings \u25B8 Playback.",
@@ -1204,16 +1222,34 @@
         for (var i = 0; i < CHANGELOG.length; i++) if (CHANGELOG[i].version === v) return CHANGELOG[i];
         return null;
     }
+    function verCmp(a, b) {
+        var x = String(a || "0").split("."), y = String(b || "0").split(".");
+        for (var i = 0; i < Math.max(x.length, y.length); i++) {
+            var d = (parseInt(x[i], 10) || 0) - (parseInt(y[i], 10) || 0);
+            if (d) return d < 0 ? -1 : 1;
+        }
+        return 0;
+    }
+    // Every entry newer than `since`, newest first — so someone who skipped a
+    // release still reads what they missed.
+    function entriesSince(since) {
+        var out = [];
+        CHANGELOG.forEach(function (e) { if (verCmp(e.version, since) > 0) out.push(e); });
+        out.sort(function (a, b) { return verCmp(b.version, a.version); });
+        return out;
+    }
 
-    function showWhatsNew(entry) {
-        if (!entry) return;
-        $("wnVersion").textContent = "v" + entry.version;
+    function showWhatsNew(entries) {
+        if (!entries || !entries.length) return;
+        $("wnVersion").textContent = "v" + appVersion();
         var list = $("wnList");
         list.innerHTML = "";
-        entry.items.forEach(function (text) {
-            var li = document.createElement("li");
-            li.textContent = text;
-            list.appendChild(li);
+        entries.forEach(function (entry) {
+            entry.items.forEach(function (text) {
+                var li = document.createElement("li");
+                li.textContent = text;
+                list.appendChild(li);
+            });
         });
         $("whatsNewModal").hidden = false;
     }
@@ -1223,9 +1259,10 @@
     function maybeShowWhatsNew() {
         var v = appVersion();
         if (config.settings.seenVersion === v) return;
+        var since = config.settings.seenVersion || "0.0.0";
         config.settings.seenVersion = v;
         saveConfig();
-        showWhatsNew(changelogFor(v));
+        showWhatsNew(entriesSince(since));
     }
 
     // ============ Premiere helpers ============
@@ -1327,6 +1364,7 @@
     function init() {
         applyIcons();
         loadConfig();
+        previewExpanded = config.settings.previewOpen !== false;
         applyTheme(currentTheme());
         initSplitter();
         buildTree();
@@ -1368,7 +1406,7 @@
 
         // What's new
         $("showWhatsNew").addEventListener("click", function () {
-            showWhatsNew(changelogFor(appVersion()) || CHANGELOG[0]);
+            showWhatsNew([changelogFor(appVersion()) || CHANGELOG[0]]);
         });
         $("wnClose").addEventListener("click", closeWhatsNew);
         $("whatsNewModal").addEventListener("click", function (e) { if (e.target === this) closeWhatsNew(); });

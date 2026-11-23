@@ -20,6 +20,30 @@
     var CONFIG = path.join(LIB_DIR, "config.json");
 
     var AUDIO_EXT = [".wav", ".mp3", ".m4a", ".aac", ".aif", ".aiff", ".flac", ".ogg", ".wma"];
+    // Icon/graphic folders: these drop onto a VIDEO track instead of an audio one.
+    var IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".tif", ".tiff"];
+    // Chromium can't decode everything Premiere can import (TIFF above all).
+    // A thumbnail that fails falls back to this neutral placeholder instead of
+    // the browser's broken-image glyph — the file still drags and adds fine.
+    var MISSING_ART = "data:image/svg+xml;charset=utf8," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">' +
+        '<rect x="7" y="11" width="34" height="26" rx="3" fill="none" stroke="#5f5f5f" stroke-width="2"/>' +
+        '<circle cx="17.5" cy="20" r="2.8" fill="#5f5f5f"/>' +
+        '<path d="M11 33.5l8.5-8.5 5.5 5.5 5-4 7 7z" fill="#5f5f5f"/></svg>');
+
+    // Swap in the placeholder once; the flag stops a loop if it ever fails too.
+    function onImageError(img) {
+        if (img.getAttribute("data-fallback")) return;
+        img.setAttribute("data-fallback", "1");
+        img.classList.add("thumb-missing");
+        img.src = MISSING_ART;
+    }
+
+    function kindOf(ext) {
+        if (AUDIO_EXT.indexOf(ext) !== -1) return "audio";
+        if (IMAGE_EXT.indexOf(ext) !== -1) return "image";
+        return null;
+    }
 
     var config = { version: 2, roots: [], favorites: [], tags: [], fileTags: {}, settings: { trackIndex: 0 } };
     var tree = [];                 // array of root folder nodes
@@ -97,12 +121,14 @@
             if (ent.isDirectory()) {
                 var child = scanFolder(full);
                 if (child.files.length || child.folders.length) node.folders.push(child);
-            } else if (AUDIO_EXT.indexOf(path.extname(ent.name).toLowerCase()) !== -1) {
-                node.files.push({
+            } else {
+                var ext = path.extname(ent.name).toLowerCase(), kind = kindOf(ext);
+                if (kind) node.files.push({
                     name: path.parse(ent.name).name,
                     file: ent.name,
                     path: full,
-                    ext: path.extname(ent.name).slice(1).toLowerCase()
+                    ext: ext.slice(1),
+                    kind: kind
                 });
             }
         });
@@ -430,8 +456,15 @@
             tile.style.top = (m.pad + row * m.rowH) + "px";
         }
 
-        var canvas = document.createElement("canvas");
-        canvas.className = "thumb";
+        // Icons render as the image itself; sounds get a decoded waveform.
+        var isImg = f.kind === "image";
+        var canvas = document.createElement(isImg ? "img" : "canvas");
+        canvas.className = "thumb" + (isImg ? " thumb-img" : "");
+        if (isImg) {
+            canvas.alt = "";
+            canvas.addEventListener("error", function () { onImageError(canvas); });
+            canvas.src = fileUrl(f.path);
+        }
         if (m.list) {
             canvas.style.width = m.thumbW + "px"; canvas.style.height = m.thumbH + "px";
             canvas.style.flex = "0 0 " + m.thumbW + "px";
@@ -473,6 +506,7 @@
         // If this tile is the selected sound with effects applied, drag the
         // baked file; otherwise drag the original.
         tile.addEventListener("dragstart", function (e) {
+            stopPlayback();          // don't keep previewing over the timeline
             var dragPath = dragFileFor(f);
             try {
                 e.dataTransfer.setData("com.adobe.cep.dnd.file.0", dragPath);
@@ -480,7 +514,7 @@
             } catch (err) {}
         });
 
-        decodeQueue.push({ file: f, canvas: canvas });
+        if (!isImg) decodeQueue.push({ file: f, canvas: canvas });
         return tile;
     }
 
@@ -547,7 +581,7 @@
     };
     player.gain.connect(AudioEngine.context.destination);
 
-    var $player = $("player"), $pPlay = $("pPlay"), $pSeek = $("pSeek"),
+    var $player = $("player"), $pImage = $("pImage"), $pPlay = $("pPlay"), $pSeek = $("pSeek"),
         $pTime = $("pTime"), $pWave = $("pWave"), $pPitch = $("pPitch"),
         $pPitchVal = $("pPitchVal"), $pReverse = $("pReverse");
 
@@ -562,8 +596,30 @@
     // Playback turns it off; missing/older configs default to on.
     function autoPlayEnabled() { return config.settings.autoPlay !== false; }
 
-    function loadIntoPlayer(f) {
+    // An icon has nothing to play: show it, and hide the audio-only controls.
+    function loadImageIntoPlayer(f) {
         stopPlayback();
+        player.sound = f; player.buffer = null; player.reversedBuf = null;
+        player.mode = "img"; player.duration = 0; player.startOffset = 0;
+        $("pHeadName").textContent = f.name;
+        $player.classList.add("img-mode");
+        $pWave.hidden = true;
+        $pImage.hidden = false;
+        $pImage.classList.remove("thumb-missing");
+        $pImage.removeAttribute("data-fallback");
+        $pImage.onerror = function () { onImageError($pImage); };
+        $pImage.src = fileUrl(f.path);
+        $player.hidden = false;
+        setPreviewExpanded(previewExpanded);
+    }
+
+    function loadIntoPlayer(f) {
+        if (f.kind === "image") return loadImageIntoPlayer(f);
+        stopPlayback();
+        $player.classList.remove("img-mode");
+        $pWave.hidden = false;
+        $pImage.hidden = true;
+        $pImage.removeAttribute("src");
         player.sound = f; player.buffer = null; player.reversedBuf = null;
         player.pitch = 0; player.reverse = false; player.reverb = 0; player.treble = 0; player.startOffset = 0;
         $pPitch.value = "0"; $pPitchVal.textContent = "0"; $pReverse.checked = false;
@@ -613,7 +669,7 @@
             config.settings.previewOpen = expanded;
             saveConfig();
         }
-        if (expanded) {
+        if (expanded && player.mode !== "img") {
             // canvas was clipped while collapsed — redraw to current size
             if (player.buffer) drawPreviewWave(); else renderPreviewCanvas();
         }
@@ -807,14 +863,17 @@
     function addToTimeline(mode) {
         var snd = selectedSound;
         if (!snd) return;
+        stopPlayback();            // the clip is on the timeline now — stop previewing it
+        if (snd.kind === "image") return doDrop(snd.path, mode, "video");
         if (!hasEffects()) return doDrop(snd.path, mode);
         setStatus("Rendering…");
         renderToFile(snd).then(function (tmp) { doDrop(tmp, mode); })
             .catch(function (e) { setStatus("Render failed: " + e.message, "err"); });
     }
 
-    function doDrop(filePath, mode) {
-        var script = "dropSFXAtPlayhead(" + JSON.stringify(filePath) + ", " + JSON.stringify(mode || "overwrite") + ")";
+    function doDrop(filePath, mode, kind) {
+        var script = "dropSFXAtPlayhead(" + JSON.stringify(filePath) + ", " + JSON.stringify(mode || "overwrite") +
+            ", " + JSON.stringify(kind || "audio") + ")";
         cs.evalScript(script, function (res) {
             var r = parseResult(res);
             if (r.ok) setStatus(r.msg || "Added.", "ok"); else setStatus(r.err || "Add failed.", "err");
@@ -888,9 +947,16 @@
             row.addEventListener("click", function () {
                 var i = selectedTags.indexOf(tag.id);
                 if (i === -1) selectedTags.push(tag.id); else selectedTags.splice(i, 1);
-                if (selectedTags.length) { selectedFolder = null; renderTree(); }
+                // Picking a tag replaces what you were searching for rather than
+                // narrowing it, so you see everything carrying that tag.
+                if (selectedTags.length) {
+                    $search.value = "";
+                    selectedFolder = null;
+                    renderTree();
+                }
                 renderTags();
                 renderGrid();
+                refreshTreeCounts();
             });
             list.appendChild(row);
         });
@@ -1189,6 +1255,14 @@
     // itself can tell the user what changed the first time it reopens. Seen
     // versions are recorded in config.json, which updates never overwrite.
     var CHANGELOG = [
+        {
+            version: "1.3.0",
+            items: [
+                "Icon folders — add a folder of PNG/JPG/SVG/GIF graphics the same way you add sounds, then drag one onto the timeline or hit Add. Icons land on the targeted video track; sounds still go to the targeted audio track.",
+                "Adding a sound to the timeline now stops the preview, instead of playing on over your sequence. Dragging one out does the same.",
+                "Clicking a tag now clears the search box instead of filtering inside it, so you see everything carrying that tag."
+            ]
+        },
         {
             version: "1.2.1",
             items: [

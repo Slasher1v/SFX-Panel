@@ -326,6 +326,23 @@ body { display: flex; flex-direction: column; height: 100vh; }
 .caption .cstar:hover { color: var(--star); }
 .caption .cstar.on { color: var(--star); }
 
+/* ---- Icons / graphics ---- */
+/* Image tiles show the artwork itself, padded so transparent icons read on
+   the dark tile and tall/wide ones aren't cropped. */
+.thumb-img { object-fit: contain; padding: 6px; }
+/* Placeholder shown when Chromium can't draw the file (see MISSING_ART). */
+.thumb-missing { opacity: .6; }
+.tile.listrow .thumb-img { padding: 3px; }
+/* Preview for an icon: the picture replaces the waveform, and the audio-only
+   transport and effect controls are hidden. */
+.pimage {
+    width: 100%; max-height: 180px; object-fit: contain; display: block;
+    background: var(--thumb-bg); border: 1px solid var(--border); border-radius: 4px;
+}
+.player.img-mode .transport,
+.player.img-mode .ctl-group,
+.player.img-mode .rev { display: none; }
+
 .grid .empty { color: var(--text-dim); text-align: center; padding: 50px 16px; line-height: 1.6; grid-column: 1 / -1; }
 
 /* ============ Preview player ============ */

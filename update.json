@@ -1,7 +1,7 @@
 {
-  "version": "1.2.1",
+  "version": "1.3.0",
   "baseUrl": "https://raw.githubusercontent.com/Slasher1v/SFX-Panel/main/",
-  "notes": "The preview now opens when you click a sound.",
+  "notes": "Icon folders you can drag to the timeline, plus preview and tag fixes.",
   "files": [
     "index.html",
     "css/style.css",

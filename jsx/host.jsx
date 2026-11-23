@@ -61,15 +61,20 @@ function getSequenceInfo() {
     }
 }
 
-// Import (if needed) and overwrite the SFX onto the TARGETED audio track at
-// the current playhead (the track whose target button is lit blue). Falls
-// back to A1 if nothing is targeted.
-function dropSFXAtPlayhead(filePath, mode) {
+// Import (if needed) and overwrite the clip onto the TARGETED track at the
+// current playhead (the track whose target button is lit blue). Sounds go to
+// an audio track, icons/graphics (kind "video") to a video track. Falls back
+// to the first track if nothing is targeted.
+function dropSFXAtPlayhead(filePath, mode, kind) {
     try {
         if (!app.project) return _err("No project open");
         var seq = app.project.activeSequence;
         if (!seq) return _err("No active sequence — open a sequence first");
-        if (seq.audioTracks.numTracks === 0) return _err("Sequence has no audio tracks");
+        var isVideo = (kind === "video");
+        var trackList = isVideo ? seq.videoTracks : seq.audioTracks;
+        if (trackList.numTracks === 0) {
+            return _err("Sequence has no " + (isVideo ? "video" : "audio") + " tracks");
+        }
 
         // Reuse the clip if it's already in the project, otherwise import it.
         var item = _findItemByPath(app.project.rootItem, filePath);
@@ -79,15 +84,15 @@ function dropSFXAtPlayhead(filePath, mode) {
         }
         if (!item) return _err("Could not import file: " + filePath);
 
-        // Find the targeted audio track; fall back to A1.
+        // Find the targeted track of the right kind; fall back to the first.
         var track = null, trackIndex = 0;
-        for (var i = 0; i < seq.audioTracks.numTracks; i++) {
-            var t = seq.audioTracks[i];
+        for (var i = 0; i < trackList.numTracks; i++) {
+            var t = trackList[i];
             var targeted = false;
             try { targeted = t.isTargeted(); } catch (e) {}
             if (targeted) { track = t; trackIndex = i; break; }
         }
-        if (!track) { track = seq.audioTracks[0]; trackIndex = 0; }
+        if (!track) { track = trackList[0]; trackIndex = 0; }
 
         // Playhead position in seconds (with a ticks fallback for safety).
         var pos = seq.getPlayerPosition();
@@ -99,7 +104,7 @@ function dropSFXAtPlayhead(filePath, mode) {
         if (mode === "insert") track.insertClip(item, seconds);
         else track.overwriteClip(item, seconds);
 
-        return _ok("Added \"" + item.name + "\" on A" + (trackIndex + 1));
+        return _ok("Added \"" + item.name + "\" on " + (isVideo ? "V" : "A") + (trackIndex + 1));
     } catch (e) {
         return _err("Script error: " + e.toString());
     }

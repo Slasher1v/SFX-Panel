@@ -23,6 +23,7 @@ unsigned extensions automatically.
 ## Features
 
 - **Folder library** — point it at any folder of sound effects (`+ Add folder`); nested subfolders become a browsable tree. Hover a folder you've added and click the `×` to take it back out.
+- **Icon folders** — add a folder of PNG / JPG / SVG / GIF graphics the same way. Icons show as thumbnails and drop onto the targeted **video** track, so you can drag overlays straight onto the timeline.
 - **Waveform thumbnails** for WAV / MP3 / M4A / AIFF / FLAC / OGG, virtualized so 2,000+ file folders stay fast.
 - **Preview player** — click a sound and it plays straight away (switchable in Settings). Stereo waveform, scrub, volume, and bake-in **Pitch**, **Reverb** (with a real tail), **Treble** (EQ), and **Reverse**.
 - **Add to timeline** at the playhead on the **targeted** audio track.
